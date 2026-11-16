@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>CRICKCAST – Live Cricket Streaming</title>
+  <title>CRICKCAST – Sony Sports Live</title>
   <meta name="viewport"
     content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="claude:viewport-fit-sides" content="cover">
@@ -17,7 +17,7 @@
       --line: #2b405d;
       --txt: #f5f8ff;
       --muted: #9eb0ca;
-      --red: #f0142f
+      --red: #1677ff
     }
 
     * {
@@ -60,7 +60,7 @@
       width: 62px;
       height: 62px;
       border: 5px solid #243b5b;
-      border-top-color: var(--red);
+      border-top-color: #24c6ff;
       border-radius: 50%;
       animation: spin .8s linear infinite
     }
@@ -142,10 +142,10 @@
       width: 42px;
       height: 42px;
       border-radius: 13px;
-      background: linear-gradient(145deg, #ff334b, #b90020);
+      background: linear-gradient(145deg, #267bff, #073b9d);
       display: grid;
       place-items: center;
-      box-shadow: 0 7px 22px #f0142f40
+      box-shadow: 0 7px 22px #1677ff40
     }
 
     .brand-icon:after {
@@ -197,9 +197,9 @@
     }
 
     .tab-btn.active {
-      background: linear-gradient(135deg, #f51a35, #bd061f);
+      background: linear-gradient(135deg, #1677ff, #0845b8);
       color: white;
-      box-shadow: 0 5px 18px #f0142f40
+      box-shadow: 0 5px 18px #1677ff40
     }
 
     .tab-btn:hover:not(.active) {
@@ -217,7 +217,7 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #ff3048;
+      background: #24c6ff;
       margin-right: 5px
     }
 
@@ -335,7 +335,7 @@
 
     .feature-kicker {
       display: inline-block;
-      background: linear-gradient(110deg, #ff3048, #ba061f);
+      background: linear-gradient(110deg, #168cff, #0750c7);
       font-weight: 900;
       font-style: italic;
       padding: 7px 14px;
@@ -363,12 +363,12 @@
       gap: 9px;
       padding: 15px 27px;
       border-radius: 13px;
-      background: linear-gradient(110deg, #ff1b37, #c60020);
+      background: linear-gradient(110deg, #168cff, #0750c7);
       color: white;
       text-decoration: none;
       font-size: 15px;
       font-weight: 950;
-      box-shadow: 0 10px 26px #f0142f33
+      box-shadow: 0 10px 26px #1677ff33
     }
 
     .section-head {
@@ -468,7 +468,7 @@
     }
 
     .card-badge.live {
-      background: #f01832;
+      background: #1677ff;
       color: white
     }
 
@@ -507,7 +507,7 @@
       margin: 5px 11px 11px;
       padding: 11px;
       border-radius: 10px;
-      background: linear-gradient(110deg, #f21b35, #bc061e);
+      background: linear-gradient(110deg, #168cff, #0750c7);
       color: white;
       font-size: 12px;
       font-weight: 950
@@ -711,7 +711,7 @@
     }
 
     #joinNow {
-      background: linear-gradient(110deg, #f21b35, #bd061e);
+      background: linear-gradient(110deg, #168cff, #0750c7);
       border-color: #f21b35
     }
 
@@ -903,7 +903,7 @@
         <a class="brand" href="#">
           <div class="brand-icon"></div>
           <div>
-            <div class="brand-name">CRICK<span class="accent">CAST</span></div><span class="brand-tag">LIVE CRICKET
+            <div class="brand-name">CRICK<span class="accent">CAST</span></div><span class="brand-tag">LIVE SPORTS
               STREAMING</span>
           </div>
         </a>
@@ -932,12 +932,12 @@
         </div>
         <div class="feature-copy"><span class="feature-kicker" id="featureKicker">LIVE NOW</span>
           <h1 id="featureTitle">Catch Every Moment.</h1>
-          <p class="feature-sub" id="featureSub">Live cricket and upcoming matches, all in one place.</p><a
+          <p class="feature-sub" id="featureSub">Sony Sports events and upcoming broadcasts, all in one place.</p><a
             class="feature-action" id="featureAction" href="#">▶ &nbsp; EXPLORE MATCHES</a>
         </div>
       </section>
       <div class="section-head">
-        <h2 class="section-title">LIVE &amp; UPCOMING MATCHES</h2>
+        <h2 class="section-title">SONY SPORTS &amp; UPCOMING EVENTS</h2>
       </div>
       <div id="ch-grid"></div>
     </main>
@@ -980,7 +980,7 @@
     (function () {
       "use strict";
 
-      var API = "https://raw.githubusercontent.com/doctor-8trange/nexphi0/main/data/icc.json";
+      var API = "https://raw.githubusercontent.com/doctor-8trange/zyphora/main/data/sony.json";
 
       var $overlay = document.getElementById("overlay");
       var $loadMsg = document.getElementById("loadMsg");
@@ -995,51 +995,30 @@
       var _all = [];
       var _tab = 'all';
 
-      function getId(m) {return m._entityId || m.slug || (m.fields && m.fields.videoId) || '';}
-      function getTitle(m) {return m.title || m.slug || 'Untitled Match';}
+      function getId(m) {
+        return m && m.contentId != null ? String(m.contentId) : '';
+      }
+      function getTitle(m) {
+        var raw = m && m.video_info && m.video_info.title || 'Untitled Event';
+        return raw.replace(/^Upcoming\s*-\s*/i, '');
+      }
       function getThumb(m) {
-        return m.thumbnail && (m.thumbnail.thumbnailUrl || m.thumbnail.templateUrl) || '';
+        var images = m && m.image_cdn;
+        return images && (images.landscape_thumb || images.thumbnail || images.portrait_thumb) || '';
       }
       function getTime(m) {
-        var raw = m.fields && m.fields.scheduledStartTime;
-        if (!raw) return '';
-        var d = new Date(raw);
-        if (isNaN(d.getTime())) return '';
-        return d.toLocaleString('en-IN', {
-          timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric',
-          month: 'short', hour: 'numeric', minute: '2-digit', hour12: true
-        }) + ' IST';
+        var start = m && m.air_dates && m.air_dates.contractStartDate || '';
+        return start ? 'Starts ' + start : '';
       }
       function getUrl(m) {
-        return m.playback && m.playback.playbackUrl || '';
+        var v = m && m.stream_info && m.stream_info.platformVariants;
+        if (!v) return '';
+        if (v.videoUrl && v.videoUrl !== 'NA') return v.videoUrl;
+        return '';
       }
-      function getPlaybackHeaders(m) {
-        var result = {};
-        var lines = m.playback && Array.isArray(m.playback.headers) ? m.playback.headers : [];
-        lines.forEach(function (line) {
-          if (typeof line !== 'string') return;
-          var i = line.indexOf(':');
-          if (i <= 0) return;
-          var key = line.slice(0, i).trim();
-          var value = line.slice(i + 1).trim();
-          if (key && value) result[key] = value;
-        });
-        return result;
-      }
-      function buildKeys(m) {
-        var out = {};
-        var hex = m.playback && m.playback.keys && m.playback.keys.hex;
-        if (typeof hex === 'string') {
-          var p = hex.split(':');
-          if (p.length >= 2 && p[0].trim() && p[1].trim()) {
-            out[p[0].trim().toLowerCase()] = p[1].trim().toLowerCase();
-          }
-        }
-        return out;
-      }
-      function isMatchLive(m) {
-        return !!(m && m.fields && String(m.fields.videoStatus || '').toLowerCase() === 'live');
-      }
+      function getPlaybackHeaders(m) {return {};}
+      function buildKeys(m) {return {};}
+      function isMatchLive(m) {return !!(m && m._live);}
       function getTier() {
         var mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4,
           mob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent),
@@ -1069,16 +1048,15 @@
         var r = await fetch(API, {cache: "no-store"});
         if (!r.ok) throw new Error("HTTP " + r.status);
         var d = await r.json();
-        if (!d || !Array.isArray(d.live) || !Array.isArray(d.upcoming)) {
-          throw new Error("Invalid ICC JSON: expected live and upcoming arrays.");
+        if (!d || !Array.isArray(d.data) || !Array.isArray(d.upcoming)) {
+          throw new Error("Invalid Sony JSON: expected data and upcoming arrays.");
         }
         var all = [];
-        d.live.forEach(function (m) {m._live = isMatchLive(m); all.push(m);});
+        d.data.forEach(function (m) {m._live = true; all.push(m);});
         d.upcoming.forEach(function (m) {m._live = false; all.push(m);});
-        all.sort(function (a, b) {return a._live === b._live ? 0 : (a._live ? -1 : 1);});
         document.getElementById('cntAll').textContent = all.length;
-        document.getElementById('cntLive').textContent = all.filter(function (m) {return m._live;}).length;
-        document.getElementById('cntUp').textContent = all.filter(function (m) {return !m._live;}).length;
+        document.getElementById('cntLive').textContent = d.data.length;
+        document.getElementById('cntUp').textContent = d.upcoming.length;
         return {channels: all, meta: d};
       }
       window.setTab = function (tab) {
@@ -1206,8 +1184,8 @@
         if (isUpcoming || !url) {
           showOverlay();
           var timeMsg = getTime(m) || 'soon';
-          setMsg('⏰ Waiting for match to start…\n' + timeMsg);
-          toast('⏰ Match not live yet — ' + timeMsg, "warn", 0);
+          setMsg('⏰ Event stream is not available yet.\n' + timeMsg);
+          toast('⏰ Stream not available yet — ' + timeMsg, "warn", 0);
 
           var waitStart = Date.now();
           var WAIT_MAX = 30 * 60 * 1000;
