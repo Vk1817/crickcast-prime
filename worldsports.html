@@ -1022,6 +1022,186 @@
   </style>
 
   <script data-cfasync="false" src="https://capitalhospitals.org/1/c0cd0df1669feb756d67ffd3d77a4c3e"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <style>
+    .player-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 180;
+      background: #000e;
+      backdrop-filter: blur(9px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px
+    }
+
+    .player-backdrop.show {
+      display: flex
+    }
+
+    .player-window {
+      width: min(1120px, 100%);
+      max-height: 92vh;
+      overflow: auto;
+      background: #101018;
+      border: 1px solid #57303a;
+      border-radius: 19px;
+      box-shadow: 0 25px 90px #000c
+    }
+
+    .player-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 17px 20px;
+      border-bottom: 1px solid #30303a
+    }
+
+    .player-head small {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: #ff526b;
+      font-weight: 900
+    }
+
+    .player-head h2 {
+      font-size: 20px;
+      margin: 4px 0 0
+    }
+
+    .player-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid #484852;
+      background: #20202a;
+      color: white;
+      font-size: 25px;
+      cursor: pointer
+    }
+
+    .player-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 265px;
+      gap: 0
+    }
+
+    .video-wrap {
+      position: relative;
+      background: #000;
+      min-height: 260px;
+      aspect-ratio: 16/9;
+      display: flex;
+      align-items: center;
+      justify-content: center
+    }
+
+    .video-wrap video {
+      width: 100%;
+      height: 100%;
+      max-height: 65vh;
+      background: #000
+    }
+
+    .player-message {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 25px;
+      color: #c7c7d1;
+      font-size: 13px;
+      pointer-events: none;
+      background: #0002
+    }
+
+    .source-panel {
+      padding: 17px;
+      border-left: 1px solid #30303a;
+      background: #15151e
+    }
+
+    .source-panel h3 {
+      font-size: 14px;
+      margin: 0 0 12px
+    }
+
+    .source-choices {
+      display: grid;
+      gap: 8px
+    }
+
+    .source-choice {
+      width: 100%;
+      text-align: left;
+      padding: 11px 12px;
+      border: 1px solid #3b3b47;
+      border-radius: 10px;
+      background: #20202a;
+      color: #f5f5f8;
+      cursor: pointer
+    }
+
+    .source-choice strong {
+      display: block;
+      font-size: 12px
+    }
+
+    .source-choice small {
+      display: block;
+      color: #aaaab8;
+      font-size: 10px;
+      margin-top: 4px
+    }
+
+    .source-choice.active,
+    .source-choice:hover {
+      border-color: #ff3150;
+      background: #35121d
+    }
+
+    .player-footnote {
+      padding: 11px 18px;
+      margin: 0;
+      color: #9999a8;
+      font-size: 10px;
+      border-top: 1px solid #30303a
+    }
+
+    @media(max-width:760px) {
+      .player-backdrop {
+        padding: 8px
+      }
+
+      .player-layout {
+        grid-template-columns: 1fr
+      }
+
+      .source-panel {
+        border-left: 0;
+        border-top: 1px solid #30303a
+      }
+
+      .source-choices {
+        grid-template-columns: repeat(2, minmax(0, 1fr))
+      }
+
+      .video-wrap {
+        min-height: 210px
+      }
+    }
+
+    @media(max-width:430px) {
+      .source-choices {
+        grid-template-columns: 1fr
+      }
+    }
+  </style>
+
 </head>
 
 <body>
@@ -1130,6 +1310,28 @@
   <footer><span>© <span id="year"></span> CRICKCAST • Premium Sports Hub</span><span>Made for sports fans ♥</span>
   </footer>
 
+
+  <div class="player-backdrop" id="playerModal" aria-hidden="true">
+    <section class="player-window" role="dialog" aria-modal="true" aria-labelledby="playerTitle">
+      <header class="player-head">
+        <div><small>CRICKCAST PLAYER</small>
+          <h2 id="playerTitle">Select a stream</h2>
+        </div><button class="player-close" id="playerClose" aria-label="Close player">×</button>
+      </header>
+      <div class="player-layout">
+        <div class="video-wrap" id="videoWrap">
+          <video id="matchVideo" controls playsinline autoplay></video>
+          <div class="player-message" id="playerMessage">Choose a source to start playback.</div>
+        </div>
+        <aside class="source-panel">
+          <h3>Available sources</h3>
+          <div id="sourceChoices" class="source-choices"></div>
+        </aside>
+      </div>
+      <p class="player-footnote" id="playerFootnote">If a source does not load, try another available source.</p>
+    </section>
+  </div>
+
   <div class="modal-backdrop" id="telegramModal" role="dialog" aria-modal="true" aria-labelledby="telegramTitle">
     <div class="telegram-modal"><button class="modal-close" id="closeModal" aria-label="Close">×</button>
       <div class="modal-logo"><svg viewBox="0 0 24 24" fill="white">
@@ -1161,12 +1363,77 @@
       function teamCodes(title) {let parts = String(title || "").split(/\s+(?:vs?\.?|v)\s+/i); return [parts[0]?.trim().slice(0, 3).toUpperCase() || "LIVE", parts[1]?.trim().slice(0, 3).toUpperCase() || "NOW"]}
       function renderHero() {let m = matches.find(isLive) || matches[0]; if (!m) return; let codes = teamCodes(m.title); $("heroTitle").textContent = m.title || "LIVE SPORTS. ONE DESTINATION."; $("heroMeta").textContent = (m.category || "Sports") + " • " + (m.time || "Matchday fixtures"); $("heroBadge").textContent = isLive(m) ? "LIVE NOW" : "MATCHDAY"; $("heroTeamA").textContent = codes[0]; $("heroTeamB").textContent = codes[1]}
       function renderUpcoming() {let list = matches.filter(m => !isLive(m)).slice(0, 3); if (!list.length) list = matches.slice(0, 3); $("upcomingList").innerHTML = list.map(m => `<div class="upcoming-item"><div class="upcoming-icon">${emoji(m.category)}</div><div><strong>${esc(m.title || "Sports fixture")}</strong><small>${esc(m.time || m.category || "Upcoming fixture")}</small></div></div>`).join("") || '<div class="upcoming-item"><div class="upcoming-icon">🏆</div><div><strong>No fixtures available</strong><small>Check back soon</small></div></div>'}
-      function renderCards() {let shown = matches.filter(m => (category === "All" || (category === "More" ? !["Cricket", "Football", "Tennis", "Basketball", "Hockey", "UFC"].includes(m.category) : String(m.category || "").toLowerCase() === category.toLowerCase())) && (status === "All" || (status === "Live" ? isLive(m) : !isLive(m)))); $("matchGrid").innerHTML = shown.map(m => {let live = isLive(m), codes = teamCodes(m.title), streams = Array.isArray(m.streams) ? m.streams : []; return `<article class="match-card"><div class="match-art"><span class="match-state ${live ? "live" : "upcoming"}">${live ? "● LIVE" : "UPCOMING"}</span><div class="match-team"><div class="flag">${emoji(m.category)}</div><b>${esc(codes[0])}</b></div><span class="vs">VS</span><div class="match-team"><div class="flag">${emoji(m.category)}</div><b>${esc(codes[1])}</b></div></div><div class="match-info"><div class="match-category">${esc(m.category || "SPORTS")}</div><h3>${esc(m.title || "Sports fixture")}</h3><div class="match-time">◷ &nbsp;${esc(String(m.time || "Schedule to be announced").replace(/^🔴\\s*/, ""))}</div><div class="match-bottom"><span class="source-count"><b>${streams.length}</b> sources listed</span><button class="match-action ${streams.length ? "" : "disabled"}" ${streams.length ? `data-sources="${esc(streams.map(s => s.name || "Source").join(", "))}"` : "disabled"}>${live ? "WATCH LIVE" : "VIEW SOURCES"}</button></div></div></article>`}).join("") || '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#aaa">No matches in this filter.</div>'}
+      function renderCards() {let shown = matches.filter(m => (category === "All" || (category === "More" ? !["Cricket", "Football", "Tennis", "Basketball", "Hockey", "UFC"].includes(m.category) : String(m.category || "").toLowerCase() === category.toLowerCase())) && (status === "All" || (status === "Live" ? isLive(m) : !isLive(m)))); $("matchGrid").innerHTML = shown.map(m => {let live = isLive(m), codes = teamCodes(m.title), streams = Array.isArray(m.streams) ? m.streams : []; return `<article class="match-card"><div class="match-art"><span class="match-state ${live ? "live" : "upcoming"}">${live ? "● LIVE" : "UPCOMING"}</span><div class="match-team"><div class="flag">${emoji(m.category)}</div><b>${esc(codes[0])}</b></div><span class="vs">VS</span><div class="match-team"><div class="flag">${emoji(m.category)}</div><b>${esc(codes[1])}</b></div></div><div class="match-info"><div class="match-category">${esc(m.category || "SPORTS")}</div><h3>${esc(m.title || "Sports fixture")}</h3><div class="match-time">◷ &nbsp;${esc(String(m.time || "Schedule to be announced").replace(/^🔴\\s*/, ""))}</div><div class="match-bottom"><span class="source-count"><b>${streams.length}</b> sources listed</span><button class="match-action ${streams.length ? "" : "disabled"}" ${streams.length ? `data-match-index="${matches.indexOf(m)}"` : "disabled"}>${live ? "WATCH LIVE" : "VIEW SOURCES"}</button></div></div></article>`}).join("") || '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#aaa">No matches in this filter.</div>'}
       function renderCounts() {let live = matches.filter(isLive).length; $("allCount").textContent = "(" + matches.length + ")"; $("liveCount").textContent = "(" + live + ")"; $("upCount").textContent = "(" + (matches.length - live) + ")"}
       async function load() {try {let r = await fetch(API, {cache: "no-store"}); if (!r.ok) throw Error("HTTP " + r.status); let d = await r.json(); if (!d || !Array.isArray(d.matches)) throw Error("Unexpected sports.json format"); matches = d.matches; renderCounts(); renderHero(); renderUpcoming(); renderCards()} catch (e) {$("matchGrid").innerHTML = `<div style="grid-column:1/-1;padding:35px;text-align:center;color:#ff8ca0">Unable to load fixtures. ${esc(e.message)}</div>`} }
       document.querySelectorAll(".sport-tab").forEach(b => b.addEventListener("click", () => {document.querySelectorAll(".sport-tab").forEach(x => x.classList.remove("active")); b.classList.add("active"); category = b.dataset.category; renderCards()}));
       document.querySelectorAll(".pill").forEach(b => b.addEventListener("click", () => {document.querySelectorAll(".pill").forEach(x => x.classList.remove("active")); b.classList.add("active"); status = b.dataset.status; renderCards()}));
-      $("matchGrid").addEventListener("click", e => {let b = e.target.closest("[data-sources]"); if (b) alert("Available sources: " + b.dataset.sources)});
+      let activeHls = null;
+      function stopPlayback() {
+        if (activeHls) {activeHls.destroy(); activeHls = null;}
+        const v = $("matchVideo"); v.pause(); v.removeAttribute("src"); v.load();
+      }
+      function parseStreamUrl(stream) {
+        let raw = String(stream.formatted_url || stream.url || "").trim();
+        let parts = raw.split("|");
+        let url = parts.shift().trim();
+        let headers = {};
+        parts.join("|").split("&").forEach(pair => {
+          let i = pair.indexOf("="); if (i < 0) return;
+          let k = decodeURIComponent(pair.slice(0, i)).trim().toLowerCase();
+          let val = decodeURIComponent(pair.slice(i + 1)).trim();
+          if (k && val) headers[k] = val;
+        });
+        return {url, headers};
+      }
+      function openPlayer(match) {
+        const streams = Array.isArray(match.streams) ? match.streams : [];
+        $("playerTitle").textContent = match.title || "Match stream";
+        $("playerFootnote").textContent = "Select a source. If playback fails, try another source or check stream availability.";
+        $("sourceChoices").innerHTML = streams.map((s, i) => `<button class="source-choice" data-source-index="${i}"><strong>${esc(s.name || "Source " + (i + 1))}</strong><small>${esc(s.type || "Video stream")}</small></button>`).join("");
+        $("playerModal").classList.add("show"); $("playerModal").setAttribute("aria-hidden", "false");
+        $("playerMessage").textContent = "Choose a source to start playback.";
+        $("sourceChoices").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+          const index = Number(b.dataset.sourceIndex), stream = streams[index];
+          $("sourceChoices").querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b));
+          playStream(stream);
+        }));
+        if (streams.length) $("sourceChoices").querySelector("button")?.click();
+      }
+      function playStream(stream) {
+        stopPlayback();
+        const parsed = parseStreamUrl(stream), url = parsed.url, v = $("matchVideo");
+        $("playerMessage").style.display = "flex";
+        $("playerMessage").textContent = "Connecting to " + (stream.name || "stream") + "…";
+        if (!url) {$("playerMessage").textContent = "This source does not contain a playable URL."; return;}
+        const fail = msg => {$("playerMessage").style.display = "flex"; $("playerMessage").textContent = msg;};
+        v.onerror = () => fail("This stream could not be played. Try another source. The stream may be offline, blocked by CORS, or require server-side headers.");
+        v.onplaying = () => {$("playerMessage").style.display = "none";};
+        if (/\.m3u8(?:$|\?)/i.test(url) || String(stream.type || "").toUpperCase().includes("M3U8")) {
+          if (v.canPlayType("application/vnd.apple.mpegurl")) {
+            v.src = url; v.play().catch(() => fail("Playback was blocked. Press Play or try another source."));
+          } else if (window.Hls && Hls.isSupported()) {
+            activeHls = new Hls({enableWorker: true, lowLatencyMode: true});
+            activeHls.loadSource(url); activeHls.attachMedia(v);
+            activeHls.on(Hls.Events.MANIFEST_PARSED, () => v.play().catch(() => fail("Press Play to start this stream.")));
+            activeHls.on(Hls.Events.ERROR, (event, data) => {if (data.fatal) fail("Stream playback failed. Try another source. This may be a CORS, network, or expired-stream issue.");});
+          } else fail("This browser does not support HLS playback.");
+        } else {
+          v.src = url; v.play().catch(() => fail("Could not start this source. Try another stream."));
+        }
+      }
+      function closePlayer() {
+        $("playerModal").classList.remove("show"); $("playerModal").setAttribute("aria-hidden", "true"); stopPlayback();
+      }
+      $("matchGrid").addEventListener("click", e => {
+        const b = e.target.closest("[data-match-index]");
+        if (!b) return;
+        const match = matches[Number(b.dataset.matchIndex)];
+        if (match) openPlayer(match);
+      });
+      $("playerClose").addEventListener("click", closePlayer);
+      $("playerModal").addEventListener("click", e => {if (e.target === $("playerModal")) closePlayer();});
+      document.addEventListener("keydown", e => {if (e.key === "Escape") closePlayer();});
       function closeModal() {$("telegramModal").classList.remove("show");}
       $("closeModal").addEventListener("click", closeModal); $("laterModal").addEventListener("click", closeModal); $("telegramModal").addEventListener("click", e => {if (e.target === $("telegramModal")) closeModal()});
       $("year").textContent = new Date().getFullYear(); load();
