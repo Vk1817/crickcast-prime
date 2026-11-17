@@ -1202,6 +1202,33 @@
     }
   </style>
 
+  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+
+  <style>
+    .player-message {
+      flex-direction: column;
+      gap: 16px
+    }
+
+    .manual-play {
+      display: none;
+      border: 0;
+      border-radius: 28px;
+      padding: 12px 24px;
+      background: linear-gradient(110deg, #ff1739, #b90025);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 6px 20px #ff123455
+    }
+
+    .manual-play:hover {
+      filter: brightness(1.12);
+      transform: translateY(-1px)
+    }
+  </style>
+
 </head>
 
 <body>
@@ -1320,8 +1347,9 @@
       </header>
       <div class="player-layout">
         <div class="video-wrap" id="videoWrap">
-          <video id="matchVideo" controls playsinline autoplay></video>
-          <div class="player-message" id="playerMessage">Choose a source to start playback.</div>
+          <video id="matchVideo" controls playsinline></video>
+          <div class="player-message" id="playerMessage"><span>Choose a source to start playback.</span><button
+              type="button" id="manualPlay" class="manual-play">▶ Play</button></div>
         </div>
         <aside class="source-panel">
           <h3>Available sources</h3>
@@ -1368,9 +1396,10 @@
       async function load() {try {let r = await fetch(API, {cache: "no-store"}); if (!r.ok) throw Error("HTTP " + r.status); let d = await r.json(); if (!d || !Array.isArray(d.matches)) throw Error("Unexpected sports.json format"); matches = d.matches; renderCounts(); renderHero(); renderUpcoming(); renderCards()} catch (e) {$("matchGrid").innerHTML = `<div style="grid-column:1/-1;padding:35px;text-align:center;color:#ff8ca0">Unable to load fixtures. ${esc(e.message)}</div>`} }
       document.querySelectorAll(".sport-tab").forEach(b => b.addEventListener("click", () => {document.querySelectorAll(".sport-tab").forEach(x => x.classList.remove("active")); b.classList.add("active"); category = b.dataset.category; renderCards()}));
       document.querySelectorAll(".pill").forEach(b => b.addEventListener("click", () => {document.querySelectorAll(".pill").forEach(x => x.classList.remove("active")); b.classList.add("active"); status = b.dataset.status; renderCards()}));
-      let activeHls = null;
+      let activeHls = null, activeDash = null;
       function stopPlayback() {
         if (activeHls) {activeHls.destroy(); activeHls = null;}
+        if (activeDash) {activeDash.reset(); activeDash = null;}
         const v = $("matchVideo"); v.pause(); v.removeAttribute("src"); v.load();
       }
       function parseStreamUrl(stream) {
@@ -1403,23 +1432,65 @@
       function playStream(stream) {
         stopPlayback();
         const parsed = parseStreamUrl(stream), url = parsed.url, v = $("matchVideo");
-        $("playerMessage").style.display = "flex";
-        $("playerMessage").textContent = "Connecting to " + (stream.name || "stream") + "…";
-        if (!url) {$("playerMessage").textContent = "This source does not contain a playable URL."; return;}
-        const fail = msg => {$("playerMessage").style.display = "flex"; $("playerMessage").textContent = msg;};
-        v.onerror = () => fail("This stream could not be played. Try another source. The stream may be offline, blocked by CORS, or require server-side headers.");
-        v.onplaying = () => {$("playerMessage").style.display = "none";};
-        if (/\.m3u8(?:$|\?)/i.test(url) || String(stream.type || "").toUpperCase().includes("M3U8")) {
+        const message = $("playerMessage"), playBtn = $("manualPlay");
+        message.style.display = "flex";
+        message.querySelector("span").textContent = "Connecting to " + (stream.name || "stream") + "…";
+        playBtn.style.display = "none";
+        if (!url) {message.querySelector("span").textContent = "This source does not contain a playable URL."; return;}
+        const showError = msg => {
+          message.style.display = "flex";
+          message.querySelector("span").textContent = msg;
+          playBtn.style.display = "inline-flex";
+        };
+        const tryPlay = () => {
+          const p = v.play();
+          if (p && typeof p.catch === "function") {
+            p.then(() => {message.style.display = "none";}).catch(() => {
+              message.style.display = "flex";
+              message.querySelector("span").textContent = "Stream is ready. Press Play to start.";
+              playBtn.style.display = "inline-flex";
+            });
+          }
+        };
+        v.onerror = () => showError("This source could not be loaded. It may be offline, expired, or blocked by the stream server's CORS policy. Try another source.");
+        v.onplaying = () => {message.style.display = "none"; playBtn.style.display = "none";};
+        playBtn.onclick = () => {
+          v.play().then(() => {message.style.display = "none"; playBtn.style.display = "none";})
+            .catch(() => showError("Playback is still blocked. Try another source or check whether the stream is available."));
+        };
+
+        const type = String(stream.type || "").toUpperCase();
+        const isDash = type.includes("MPD") || /\.mpd(?:$|\?)/i.test(url);
+        const isHls = type.includes("M3U8") || /\.m3u8(?:$|\?)/i.test(url);
+
+        if (isDash) {
+          if (window.dashjs && dashjs.MediaPlayer) {
+            activeDash = dashjs.MediaPlayer().create();
+            activeDash.initialize(v, url, false);
+            activeDash.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, tryPlay);
+            activeDash.on(dashjs.MediaPlayer.events.ERROR, () => showError("DASH stream failed to load. It may require authorised request headers, CORS access, or a valid MPD URL."));
+          } else {
+            showError("DASH playback library could not be loaded. Check your internet connection and try again.");
+          }
+        } else if (isHls) {
           if (v.canPlayType("application/vnd.apple.mpegurl")) {
-            v.src = url; v.play().catch(() => fail("Playback was blocked. Press Play or try another source."));
+            v.src = url; tryPlay();
           } else if (window.Hls && Hls.isSupported()) {
             activeHls = new Hls({enableWorker: true, lowLatencyMode: true});
             activeHls.loadSource(url); activeHls.attachMedia(v);
-            activeHls.on(Hls.Events.MANIFEST_PARSED, () => v.play().catch(() => fail("Press Play to start this stream.")));
-            activeHls.on(Hls.Events.ERROR, (event, data) => {if (data.fatal) fail("Stream playback failed. Try another source. This may be a CORS, network, or expired-stream issue.");});
-          } else fail("This browser does not support HLS playback.");
+            activeHls.on(Hls.Events.MANIFEST_PARSED, tryPlay);
+            activeHls.on(Hls.Events.ERROR, (event, data) => {
+              if (data.fatal) showError("HLS stream failed. It may be offline, expired, or blocked by CORS. Try another source.");
+            });
+          } else showError("This browser does not support HLS playback.");
         } else {
-          v.src = url; v.play().catch(() => fail("Could not start this source. Try another stream."));
+          v.src = url; tryPlay();
+        }
+
+        if (Object.keys(parsed.headers || {}).length) {
+          $("playerFootnote").textContent = "This source specifies custom request headers. Browsers cannot apply arbitrary Referer or User-Agent headers from page JavaScript; playback may require the provider's authorised playback gateway.";
+        } else {
+          $("playerFootnote").textContent = "If playback does not start, press Play or try another source. Some streams may be unavailable or blocked by their server.";
         }
       }
       function closePlayer() {
